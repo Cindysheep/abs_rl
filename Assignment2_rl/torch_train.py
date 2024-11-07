@@ -12,7 +12,7 @@ import random
 # import socket
 # import studentcode_123090823 as studentcode
 import rl_simulator
-
+import task_gen
 import time
 
 # # Quick-and-dirty TCP Server:
@@ -106,6 +106,53 @@ class DQNAgent:
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
+def train_agent_test(epoches, save_path="dqn_model.pth"):
+    
+    state_size = 7  # Change this to the number of state variables you have
+    action_size = 3  # Change this to the number of available bitrates
+    agent = DQNAgent(state_size, action_size)
+
+    for ep in range(epoches):
+        
+        start_time = time.time()
+
+        # Generate training trace and manifest files
+        trace_path = task_gen.gen_trace()
+        manifest_path = task_gen.gen_manifest()
+        
+        rl_simulator.init(trace_path, manifest_path)
+        done = False
+        total_reward = 0
+
+        while not done:
+        # for state in states:
+            # action = agent.act(state)
+
+            action, reward, next_state, state, done = rl_simulator.loop(agent)
+            # print(action, reward, next_state, state, done)
+            # next_state, reward, done = simulator.step(action)  # Get the next state and reward
+            agent.remember(state, action, reward, next_state, done)
+            # state = next_state
+            total_reward += reward
+            # print("Reward: ", reward, "Time:, ", state[5])
+
+        agent.replay(64)  # Replay experience and update the model
+        print(f"Episode: {ep+1}/{epoches}, Total Reward: {total_reward}, Epsilon: {agent.epsilon:.2f}, Time: {time.time() - start_time:.2f}")
+
+            # Save the model every certain number of episodes
+            # if (e + 1) % 100 == 0:  # Save every 100 episodes
+            # print(f"Episode: {e+1}/{episodes}, Total Reward: {total_reward}, Epsilon: {agent.epsilon:.2f}")
+        
+        # print(f"Task: {task}, Total Reward: {total_reward}, Epsilon: {agent.epsilon:.2f}")
+        torch.save({
+            'epoch': ep,
+            'model_state_dict': agent.model.state_dict(),  # Save model weights
+            'optimizer_state_dict': agent.optimizer.state_dict(),  # Save optimizer state
+            'loss': agent.loss,  # Save the current loss
+        }, save_path)
+        print(f"Model saved to {save_path}")
+
+
 def train_agent(epoches, episodes, save_path="dqn_model.pth"):
     
 
@@ -123,6 +170,7 @@ def train_agent(epoches, episodes, save_path="dqn_model.pth"):
 
             trace_path = f"./tests/{task}/trace.txt"
             manifest_path = f"./tests/{task}/manifest.json"
+
             for e in range(episodes):
                 rl_simulator.init(trace_path, manifest_path)
                 done = False
@@ -159,4 +207,5 @@ def train_agent(epoches, episodes, save_path="dqn_model.pth"):
 if __name__ == "__main__":
     total_time_start = time.time()
     train_agent(100, 100)  # Train 100 round, train 100 episodes in different tests each round
+    # train_agent_test(10000)  # Train 10000 round
     print(f"Total training time: {time.time() - total_time_start:.2f} seconds")
